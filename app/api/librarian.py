@@ -7,7 +7,7 @@ from app.api.database.config import books_collection, members_collections,user_a
 from app.crud.book_crud import add_book, edit_books, delete_book
 from app.crud.user_crud import add_user, edit_user
 from app.dependencies.depends import check, deactivate_user_acct, report
-from app.api.user_credentials import get_current_user
+from app.api.user_credentials import get_current_user,check_user_permission
 from bson import ObjectId
 import time
 import json
@@ -26,7 +26,7 @@ router_report = APIRouter(
 
 
 
-@router.post("/books/" , dependencies=[Depends(get_current_user)])
+@router.post("/books/" , dependencies=[Depends(check_user_permission)])
 def create_book(books: BookInformation):
     books = dict(books)
     book_added = add_book(books)
@@ -36,7 +36,7 @@ def create_book(books: BookInformation):
     HTTPException(status_code=400, detail="book not added")
 
 
-@router.put("/books/", dependencies=[Depends(get_current_user)])
+@router.put("/books/", dependencies=[Depends(check_user_permission)])
 def edit_book(
         *,
         id: Annotated[str, Query(description="enter the id of book you want to update")],
@@ -52,7 +52,7 @@ def edit_book(
     HTTPException(status_code=400, detail="not updated")
 
 
-@router.delete("/books/", dependencies=[Depends(get_current_user)])
+@router.delete("/books/", dependencies=[Depends(check_user_permission)])
 def delete_books(book_id: str = Query(title="Enter the ID of the book you want to delete")):
     try:
         object_id = ObjectId(book_id)
@@ -67,21 +67,21 @@ def delete_books(book_id: str = Query(title="Enter the ID of the book you want t
         raise HTTPException(status_code=400, detail="Invalid ObjectID format. Please provide a valid ObjectID.")
 
 
-@router_member.post("/user_management/", dependencies=[Depends(get_current_user)])
+@router_member.post("/user_management/", dependencies=[Depends(check_user_permission)])
 def create_user(user: NewUser):
     create_user_acct = dict(user)
     user_added = add_user(create_user_acct)
     return "user added successfully"
 
 
-@router_member.put("/user_management/", dependencies=[Depends(get_current_user)])
+@router_member.put("/user_management/", dependencies=[Depends(check_user_permission)])
 def update_user(id: Annotated[str, Query(description="enter contact information to modify")],
                 contact_information: Annotated[str, Query(description="enter contact information to modify")]):
     update_user_acct = edit_user(id, contact_information)
     return "user updated successfully"
 
 
-@router_member.patch("/user_management/", dependencies=[Depends(get_current_user)])
+@router_member.patch("/user_management/", dependencies=[Depends(check_user_permission)])
 def deactivate_user(
         *,
         id: Annotated[str, Query(title="enter the account id of user you want to activate or deactivate it")] = None,
@@ -90,7 +90,7 @@ def deactivate_user(
     return "user deactivated or activated successfully"
 
 
-@router_report.get("/report/", dependencies=[Depends(get_current_user)])
+@router_report.get("/report/", dependencies=[Depends(check_user_permission)])
 def generate_report():
     for_time = members_collections.find()
     library_book = []
