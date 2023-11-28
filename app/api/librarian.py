@@ -121,8 +121,10 @@ def generate_report():
             for title_of_book in library_book:
                 if title_of_book["title"] == books["title"]:
                     count_dict[title_of_book["title"]] = count_dict.get(title_of_book["title"], 0) + 1
-
-    max_value = max(count_dict, key=count_dict.get)
+    if count_dict:
+        max_value = max(count_dict, key=count_dict.get)
+    else:
+        max_value = "No book is borrowed by the library Patrons"
 
     """ overdue book code handler"""
     borrowed_time = members_collections.find()
@@ -154,13 +156,14 @@ def generate_report():
         return "No book is borrowed by the user"
     available_books = []
     staus_over_book = []
+    status_overdue_books = []
     availibility = books_collection.find({}, {"title": 1, "availibility": 1, "_id": 0})
-    staus_overdue = books_collection.find({}, {"title": 1, "overdue": 1, "_id": 0})
+    status_overdue = books_collection.find({}, {"title": 1, "overdue": 1, "_id": 0})
 
     for availibility in availibility:
         available_books.append(availibility)
 
-    for status in staus_overdue:
+    for status in status_overdue:
         staus_over_book.append(status)
 
     return {"popular book": max_value, "available books":available_books, "over due" : staus_over_book}

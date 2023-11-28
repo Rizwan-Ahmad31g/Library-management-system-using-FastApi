@@ -197,11 +197,17 @@ def return_books(id, title):
     number_of_book_borrow = book_dict.get("number of book borrow")
 
     if over_due is not None:
-        if over_due < 0:
+        if over_due > 0:
             books_collection.update_one({"title": title},
                                         {"$set": {"overdue": over_due - increment}})
+            books_collection.update_one({"title": title},
+                                        {"$set": {"overdue": over_due - increment}})
+            books_collection.update_one({"title": title},
+                                        {"$set": {"number of book borrow": number_of_book_borrow - increment}})
+            if over_due <= 0:
+                books_collection.update_one({"title": title},
+                                            {"$set": {"overdue": 0}})
 
-    else:
         books_collection.update_one({"title": title},
                                     {"$set": {"number of book borrow": number_of_book_borrow - increment}})
         book_quantity = books_collection.find_one({"title": title}, {"quantity": 1, "_id": 0})
