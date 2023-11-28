@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 import json
+from pydantic import BaseModel
 from passlib.context import CryptContext
 
 SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
@@ -20,6 +21,8 @@ router_cred = APIRouter(
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+class User(BaseModel):
+    user : str
 
 @router_cred.put("/authetication")
 def enter_user_credentials(user: Annotated[str, Query(description="Enter name")],
@@ -78,7 +81,10 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+
+
+
+def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -98,6 +104,16 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
         raise credentials_exception
     return user
 
+allowed_users = ["rizwan", "jai kishan"]
+
+def check_user_permission(user: User = Depends(get_current_user)):
+    for allow in allowed_users:
+        if user.username == allow:
+            return user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You are not permitted to access these protected resources"
+    )
 
 @router_cred.post("/token", response_model=Token)
 async def login_for_access_token(

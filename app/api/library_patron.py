@@ -3,13 +3,14 @@ from app.dependencies.depends import patron_search_book, borrow_books, borrow_hi
 from app.models.books_model import BookInformation
 from app.models.user import Activity
 from typing import Annotated
+from app.api.user_credentials import check_user_permission,get_current_user
 
 router = APIRouter(
     tags=["library patron(student,teacher,reseachers)"]
 )
 
 
-@router.get("/library_patron/")
+@router.get("/library_patron/" , dependencies=[Depends(get_current_user)])
 def search_book(book_search: Annotated[
     str, Query(description="enter book title , author or category", alias="book search")] = None):
     search = patron_search_book(book_search)
@@ -19,7 +20,7 @@ def search_book(book_search: Annotated[
         return search
 
 
-@router.put("/library_patron/")
+@router.put("/library_patron/", dependencies=[Depends(check_user_permission)])
 def request_borrow_book(
         id: Annotated[str, Query(description="Enter ID")],
         title: Annotated[str, Query(description="which book you may want to borrow")],
@@ -31,13 +32,13 @@ def request_borrow_book(
     raise HTTPException(status_code=400, detail="you are not allowed to borrow book")
 
 
-@router.get("/library_patron/{user_id}")
+@router.get("/library_patron/{user_id}", dependencies=[Depends(check_user_permission)])
 def borrowing_history(user_id: Annotated[str, Path(description="enter ID to check borrowing history")]):
     history = borrow_history(user_id)
     return history
 
 
-@router.patch("/library_patron/")
+@router.patch("/library_patron/", dependencies=[Depends(check_user_permission)])
 def return_book(id: Annotated[str, Query(description="enter ID")],
                 title: Annotated[str, Query(description="enter title of the book you want to return")]):
     title = title
