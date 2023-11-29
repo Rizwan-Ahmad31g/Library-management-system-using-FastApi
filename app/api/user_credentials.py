@@ -3,7 +3,7 @@ from app.models.user_authentication_model import Token
 from datetime import datetime, timedelta
 from typing import Annotated
 from fastapi import APIRouter
-from app.api.database.config import user_authetication_collection
+from app.api.database.config import user_authetication_collection, members_collections
 from app.models.user_authentication_model import UserInDB, TokenData
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -21,31 +21,31 @@ router_cred = APIRouter(
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
 class User(BaseModel):
-    user : str
+    user: str
+    role: str
 
-@router_cred.put("/authetication")
-def enter_user_credentials(user: Annotated[str, Query(description="Enter name")],
-                           password: Annotated[str, Query(description="Create Password")],
-                           reenter: Annotated[str, Query(description="Reenter your password")] = None):
-    user_password = get_password_hash(password)
-    user_reenter = get_password_hash(reenter)
-    user_id = user_authetication_collection.find_one({"username": user}, {"username": 1, "_id": 0})
-    if user_id is not None:
-       raise HTTPException(status_code=400 , detail="User name already taken")
-    else:
-        if password == reenter:
-            user_credentials = {
-                "username": user,
-                "hashed_password": user_password
-            }
-            data_entry = user_authetication_collection.insert_one(user_credentials)
 
-            if data_entry:
-                raise HTTPException(status_code=200, detail="user created succesfully")
-        else:
-            raise HTTPException(status_code=400, detail="password doest not match")
-
+def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    user_db_collection = user_authetication_collection.find_one({"username": username}, {"_id": 0})
+    user = get_user(user_db_collection, username=token_data.username)
+    if user is None:
+        raise credentials_exception
+    return user
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -58,7 +58,7 @@ def get_password_hash(password):
 def get_user(database, username: str):
     user_data = user_authetication_collection.find_one({"username": username}, {"_id": 0})
     if user_data:
-        return UserInDB(username=user_data["username"], hashed_password=user_data["hashed_password"])
+        return UserInDB(username=user_data["username"], hashed_password=user_data["hashed_password"] , role = user_data["role"])
 
 
 def authenticate_user(user_db_collection, username: str, password: str):
@@ -84,36 +84,16 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 
 
-def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
-    except JWTError:
-        raise credentials_exception
-    user_db_collection = user_authetication_collection.find_one({"username": username}, {"_id": 0})
-    user = get_user(user_db_collection, username=token_data.username)
-    if user is None:
-        raise credentials_exception
-    return user
 
-allowed_users = ["rizwan", "jai kishan"]
 
 def check_user_permission(user: User = Depends(get_current_user)):
-    for allow in allowed_users:
-        if user.username == allow:
-            return user
+    if user.role == "admin":
+        return user
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="You are not permitted to access these protected resources"
     )
+
 
 @router_cred.post("/token", response_model=Token)
 async def login_for_access_token(
@@ -134,3 +114,35 @@ async def login_for_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router_cred.put("/authetication")
+def enter_user_credentials(user: Annotated[str, Query(description="Enter name")],
+                           password: Annotated[str, Query(description="Create Password")],
+                           reenter: Annotated[str, Query(description="Reenter your password")] = None):
+    user_password = get_password_hash(password)
+    user_reenter = get_password_hash(reenter)
+    user_id = user_authetication_collection.find_one({"username": user}, {"username": 1, "_id": 0})
+    if user_id is not None:
+        raise HTTPException(status_code=400, detail="User name already taken")
+    else:
+        if password == reenter:
+            user_credentials = {
+                "username": user,
+                "hashed_password": user_password
+            }
+            data_entry = user_authetication_collection.insert_one(user_credentials)
+
+            if data_entry:
+                raise HTTPException(status_code=200, detail="user created succesfully")
+        else:
+            raise HTTPException(status_code=400, detail="password doest not match")
+
+
+@router_cred.patch("/authetication", dependencies=[Depends(check_user_permission)])
+def admin(user: Annotated[str, Query(description="Enter name")],
+          Role: Annotated[str, Query(description="Enter role you want to assign")],
+          ):
+        user_role_update = user_authetication_collection.update_one({"username" : user}, {"$set" : {"role" : Role}})
+        if user_role_update:
+            raise HTTPException(status_code=200 , detail="User role updated successfully")
+        raise HTTPException(status_code=400 , detail="User not found")
