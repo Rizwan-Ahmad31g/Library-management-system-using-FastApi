@@ -142,7 +142,9 @@ def enter_user_credentials(user: Annotated[str, Query(description="Enter name")]
 def admin(user: Annotated[str, Query(description="Enter name")],
           Role: Annotated[str, Query(description="Enter role you want to assign")],
           ):
+        user_fetch = user_authetication_collection.find_one({"username" :  user} ,{"_id" : 0})
         user_role_update = user_authetication_collection.update_one({"username" : user}, {"$set" : {"role" : Role}})
-        if user_role_update:
+        if user_role_update and user_fetch is not None:
             raise HTTPException(status_code=200 , detail="User role updated successfully")
-        raise HTTPException(status_code=400 , detail="User not found")
+        else:
+            raise HTTPException(status_code=400 , detail="User not found")
